@@ -20,7 +20,7 @@ export default function DashboardPage() {
 
       {!privateKey && (
         <Alert variant="warning" title="Clé privée non déchiffrée">
-          La clé privée n'est pas disponible en mémoire. Déconnectez-vous et reconnectez-vous pour la déchiffrer.
+          La clé privée n&apos;est pas disponible en mémoire. Déconnectez-vous et reconnectez-vous pour la déchiffrer.
         </Alert>
       )}
 
