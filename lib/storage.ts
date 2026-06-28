@@ -4,6 +4,12 @@
 
 const TOKEN_KEY = 'blind_token';
 const SALT_PREFIX = 'blind_salt_';
+// Clé privée déchiffrée, conservée en sessionStorage (pas localStorage) : effacée
+// automatiquement à la fermeture de l'onglet, et jamais partagée entre onglets.
+// Compromis assumé : survit aux rechargements/redirections (meilleure UX) sans
+// persister sur le disque au-delà de la session de l'onglet.
+const PRIVATE_KEY_KEY = 'blind_pk';
+const SIGNING_PRIVATE_KEY_KEY = 'blind_sign_pk';
 
 export interface StoredSalts {
   salt_mp: string; // base64
@@ -23,6 +29,32 @@ export function loadToken(): string | null {
 export function clearToken() {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
+}
+
+// ── Clé privée (session de l'onglet uniquement) ──────────────────────────────────
+
+export function savePrivateKey(pkcs8B64: string) {
+  try { sessionStorage.setItem(PRIVATE_KEY_KEY, pkcs8B64); } catch { /* quota/indispo */ }
+}
+
+export function saveSigningPrivateKey(pkcs8B64: string) {
+  try { sessionStorage.setItem(SIGNING_PRIVATE_KEY_KEY, pkcs8B64); } catch { /* quota/indispo */ }
+}
+
+export function loadPrivateKey(): string | null {
+  try { return sessionStorage.getItem(PRIVATE_KEY_KEY); } catch { return null; }
+}
+
+export function loadSigningPrivateKey(): string | null {
+  try { return sessionStorage.getItem(SIGNING_PRIVATE_KEY_KEY); } catch { return null; }
+}
+
+export function clearPrivateKey() {
+  try { sessionStorage.removeItem(PRIVATE_KEY_KEY); } catch { /* indispo */ }
+}
+
+export function clearSigningPrivateKey() {
+  try { sessionStorage.removeItem(SIGNING_PRIVATE_KEY_KEY); } catch { /* indispo */ }
 }
 
 export function saveSalts(username: string, salts: StoredSalts) {
