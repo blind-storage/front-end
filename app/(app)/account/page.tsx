@@ -8,8 +8,10 @@ import * as api from '@/lib/api';
 import QRCode from 'qrcode';
 import {
   decryptPrivateKey,
+  decryptSigningPrivateKey,
   deriveMasterKeys,
   encryptPrivateKey,
+  encryptSigningPrivateKey,
   fromBase64,
   toBase64,
 } from '@/lib/crypto';
@@ -180,7 +182,7 @@ function LinkedProviders({ userId, token }: { userId: string; token: string }) {
 // ── Mot de passe maître ───────────────────────────────────────────────────────
 
 function ChangePasswordSection() {
-  const { user, token, privateKey, setSession } = useAuth();
+  const { user, token, privateKey, signingPrivateKey, setSession } = useAuth();
   const [oldPwd, setOldPwd] = useState('');
   const [newPwd, setNewPwd] = useState('');
   const [confirmPwd, setConfirmPwd] = useState('');
@@ -214,11 +216,30 @@ function ChangePasswordSection() {
       const newSaltBytes = generateSalt();
       const { kek: newKek, authHash: newAuthHash } = await deriveMasterKeys(newPwd, newSaltBytes);
       const newPrivKeyEnc = await encryptPrivateKey(resolvedPrivKey!, newKek);
+      let resolvedSigningPrivKey = signingPrivateKey;
+      if (!resolvedSigningPrivKey && user.sign_priv_key_enc_1) {
+        resolvedSigningPrivKey = await decryptSigningPrivateKey(user.sign_priv_key_enc_1, oldKek);
+      } else if (user.sign_priv_key_enc_1) {
+        await decryptSigningPrivateKey(user.sign_priv_key_enc_1, oldKek);
+      }
+      const newSignPrivKeyEnc = resolvedSigningPrivKey
+        ? await encryptSigningPrivateKey(resolvedSigningPrivKey, newKek)
+        : undefined;
       const newSaltB64 = toBase64(newSaltBytes);
 
-      await api.changePassword(token, { auth_hash: newAuthHash, priv_key_enc_1: newPrivKeyEnc, salt_mp: newSaltB64 });
+      await api.changePassword(token, {
+        auth_hash: newAuthHash,
+        priv_key_enc_1: newPrivKeyEnc,
+        sign_priv_key_enc_1: newSignPrivKeyEnc,
+        salt_mp: newSaltB64,
+      });
       saveSalts(user.username, { salt_mp: newSaltB64, salt_rc: salts.salt_rc });
-      setSession(token, { ...user, priv_key_enc_1: newPrivKeyEnc, salt_mp: newSaltB64 }, resolvedPrivKey!);
+      setSession(
+        token,
+        { ...user, priv_key_enc_1: newPrivKeyEnc, sign_priv_key_enc_1: newSignPrivKeyEnc, salt_mp: newSaltB64 },
+        resolvedPrivKey!,
+        resolvedSigningPrivKey,
+      );
       setStatus('ok');
       setMessage('Mot de passe maître mis à jour.');
       setOldPwd(''); setNewPwd(''); setConfirmPwd('');

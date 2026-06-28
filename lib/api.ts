@@ -70,7 +70,7 @@ export const getProfile = (token: string) =>
 
 export const changePassword = (
   token: string,
-  data: { auth_hash: string; priv_key_enc_1: string; salt_mp: string },
+  data: { auth_hash: string; priv_key_enc_1: string; salt_mp: string; sign_priv_key_enc_1?: string },
 ) => request<void>('/auth/change-password', { method: 'POST', body: JSON.stringify(data), token });
 
 // ── OIDC ─────────────────────────────────────────────────────────────────────
@@ -152,6 +152,9 @@ export interface UserResponse extends UserEntity {
   salt_rc?: string;
   priv_key_enc_1?: string | null;
   priv_key_enc_2?: string | null;
+  sign_pub_key?: string | null;
+  sign_priv_key_enc_1?: string | null;
+  sign_priv_key_enc_2?: string | null;
   tree_enc_key?: string | null;
   key_certificate?: BlindCertificate | null;
   key_certificate_signature?: string | null;

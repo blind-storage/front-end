@@ -9,11 +9,14 @@ import {
   deriveMasterKeys,
   deriveRecoveryKey,
   encryptPrivateKey,
+  encryptSigningPrivateKey,
   encryptTEK,
   exportPublicKey,
+  exportSigningPublicKey,
   generateKeyPair,
   generateRecoveryCode,
   generateSalt,
+  generateSigningKeyPair,
   generateTEK,
   toBase64,
 } from '@/lib/crypto';
@@ -66,6 +69,10 @@ export default function RegisterPage() {
       const pub_key = await exportPublicKey(keyPair.publicKey);
       const priv_key_enc_1 = await encryptPrivateKey(keyPair.privateKey, kek1);
       const priv_key_enc_2 = await encryptPrivateKey(keyPair.privateKey, kek2);
+      const signingKeyPair = await generateSigningKeyPair();
+      const sign_pub_key = await exportSigningPublicKey(signingKeyPair.publicKey);
+      const sign_priv_key_enc_1 = await encryptSigningPrivateKey(signingKeyPair.privateKey, kek1);
+      const sign_priv_key_enc_2 = await encryptSigningPrivateKey(signingKeyPair.privateKey, kek2);
 
       const tek = await generateTEK();
       const tree_enc_key = await encryptTEK(tek, keyPair.publicKey);
@@ -84,6 +91,9 @@ export default function RegisterPage() {
         pub_key,
         priv_key_enc_1,
         priv_key_enc_2,
+        sign_pub_key,
+        sign_priv_key_enc_1,
+        sign_priv_key_enc_2,
         tree_enc_key,
       });
 

@@ -116,6 +116,64 @@ export async function decryptPrivateKey(encrypted: string, kek: CryptoKey): Prom
   return importPrivateKey(await aesDecrypt(kek, encrypted));
 }
 
+export async function generateSigningKeyPair(): Promise<CryptoKeyPair> {
+  return crypto.subtle.generateKey(
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign', 'verify'],
+  );
+}
+
+export async function exportSigningPublicKey(key: CryptoKey): Promise<string> {
+  return toBase64(await crypto.subtle.exportKey('spki', key));
+}
+
+export async function importSigningPublicKey(b64: string): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'spki',
+    fromBase64(b64),
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    false,
+    ['verify'],
+  );
+}
+
+export async function exportSigningPrivateKeyBytes(key: CryptoKey): Promise<ArrayBuffer> {
+  return crypto.subtle.exportKey('pkcs8', key);
+}
+
+export async function importSigningPrivateKey(pkcs8: ArrayBuffer): Promise<CryptoKey> {
+  return crypto.subtle.importKey(
+    'pkcs8',
+    pkcs8,
+    { name: 'ECDSA', namedCurve: 'P-256' },
+    true,
+    ['sign'],
+  );
+}
+
+export async function encryptSigningPrivateKey(privateKey: CryptoKey, kek: CryptoKey): Promise<string> {
+  return aesEncrypt(kek, await exportSigningPrivateKeyBytes(privateKey));
+}
+
+export async function decryptSigningPrivateKey(encrypted: string, kek: CryptoKey): Promise<CryptoKey> {
+  return importSigningPrivateKey(await aesDecrypt(kek, encrypted));
+}
+
+export async function signBytes(privateKey: CryptoKey, data: ArrayBuffer): Promise<string> {
+  const sig = await crypto.subtle.sign({ name: 'ECDSA', hash: 'SHA-256' }, privateKey, data);
+  return toBase64(sig);
+}
+
+export async function verifyBytes(publicKey: CryptoKey, signature: string, data: ArrayBuffer): Promise<boolean> {
+  return crypto.subtle.verify(
+    { name: 'ECDSA', hash: 'SHA-256' },
+    publicKey,
+    fromBase64(signature),
+    data,
+  );
+}
+
 export async function generateTEK(): Promise<CryptoKey> {
   return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
 }
@@ -131,4 +189,51 @@ export async function encryptTEK(tek: CryptoKey, publicKey: CryptoKey): Promise<
 export async function createInitialTree(tek: CryptoKey): Promise<string> {
   const enc = new TextEncoder();
   return aesEncrypt(tek, enc.encode(JSON.stringify({ version: 1, nodes: [] })).buffer as ArrayBuffer);
+}
+
+// ── Chiffrement des fichiers (FEK = clé AES-GCM par fichier) ───────────────────
+// Chaque fichier est chiffré avec une FEK aléatoire (AES-GCM 256). La FEK est elle-même
+// chiffrée avec la clé publique RSA de l'utilisateur (enc_fek) et stockée côté serveur.
+// Le serveur ne voit jamais ni le contenu en clair, ni la FEK en clair.
+
+export async function generateFileKey(): Promise<CryptoKey> {
+  return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']);
+}
+
+// Chiffre la FEK avec la clé publique RSA → base64 (l'enc_fek envoyé au serveur).
+export async function encryptFileKey(fek: CryptoKey, publicKey: CryptoKey): Promise<string> {
+  const raw = await crypto.subtle.exportKey('raw', fek);
+  const ct = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, publicKey, raw);
+  return toBase64(ct);
+}
+
+// Récupère la FEK depuis enc_fek avec la clé privée RSA.
+export async function decryptFileKey(encFek: string, privateKey: CryptoKey): Promise<CryptoKey> {
+  const raw = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, privateKey, fromBase64(encFek));
+  return crypto.subtle.importKey('raw', raw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+}
+
+// Re-chiffre une FEK existante pour un autre utilisateur sans l'envoyer au serveur en clair.
+export async function reencryptFileKey(encFek: string, privateKey: CryptoKey, recipientPublicKey: CryptoKey): Promise<string> {
+  const raw = await crypto.subtle.decrypt({ name: 'RSA-OAEP' }, privateKey, fromBase64(encFek));
+  const ct = await crypto.subtle.encrypt({ name: 'RSA-OAEP' }, recipientPublicKey, raw);
+  return toBase64(ct);
+}
+
+// Chiffre le contenu d'un fichier : sortie = iv(12) || ciphertext (un seul blob binaire).
+export async function encryptFileContent(fek: CryptoKey, data: ArrayBuffer): Promise<Blob> {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, fek, data));
+  const out = new Uint8Array(iv.length + ct.length);
+  out.set(iv, 0);
+  out.set(ct, iv.length);
+  return new Blob([out], { type: 'application/octet-stream' });
+}
+
+// Déchiffre iv||ciphertext et retourne les octets en clair.
+export async function decryptFileContent(fek: CryptoKey, blob: ArrayBuffer): Promise<ArrayBuffer> {
+  const bytes = new Uint8Array(blob);
+  const iv = bytes.subarray(0, 12);
+  const ct = bytes.subarray(12);
+  return crypto.subtle.decrypt({ name: 'AES-GCM', iv }, fek, ct);
 }
