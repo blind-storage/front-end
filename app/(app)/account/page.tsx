@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { useAuth } from '@/context/auth';
@@ -294,7 +295,7 @@ function TotpQrCode({ uri }: { uri: string }) {
   }, [uri]);
 
   if (!dataUrl) return <div className="h-[200px] w-[200px] animate-pulse rounded-lg bg-slate-800" />;
-  return <img src={dataUrl} alt="QR code TOTP" className="rounded-lg" width={200} height={200} />;
+  return <Image src={dataUrl} alt="QR code TOTP" className="rounded-lg" width={200} height={200} unoptimized />;
 }
 
 function TotpSection() {

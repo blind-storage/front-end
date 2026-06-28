@@ -17,55 +17,52 @@ import { PENDING_OIDC_TOKEN_KEY } from '@/app/(auth)/oidc-unlock/page';
 function CallbackHandler() {
   const router = useRouter();
   const params = useSearchParams();
-  const { token: authToken, setSession, isLoading: authLoading } = useAuth();
-  const [error, setError] = useState('');
+  const { token: authToken, isLoading: authLoading } = useAuth();
+  const errParam = params.get('error');
+  const [asyncError, setAsyncError] = useState('');
+  const error = errParam ? decodeURIComponent(errParam) : asyncError;
 
   useEffect(() => {
     if (authLoading) return; // wait for session to be restored from localStorage
+    if (errParam) return;
 
-    const token = params.get('token');
-    const setupToken = params.get('setup_token');
-    const linkToken = params.get('link_token');
-    const email = params.get('email');
-    const err = params.get('error');
+    (async () => {
+      const token = params.get('token');
+      const setupToken = params.get('setup_token');
+      const linkToken = params.get('link_token');
+      const email = params.get('email');
 
-    if (err) {
-      setError(decodeURIComponent(err));
-      return;
-    }
+      if (token) {
+        sessionStorage.setItem(PENDING_OIDC_TOKEN_KEY, token);
+        router.replace('/oidc-unlock');
+        return;
+      }
 
-    if (token) {
-      sessionStorage.setItem(PENDING_OIDC_TOKEN_KEY, token);
-      router.replace('/oidc-unlock');
-      return;
-    }
-
-    // Provider linked from the account settings page — user is already authenticated
-    if ((setupToken || linkToken) && authToken) {
-      const oidcToken = (setupToken ?? linkToken)!;
-      (async () => {
+      // Provider linked from the account settings page — user is already authenticated
+      if ((setupToken || linkToken) && authToken) {
+        const oidcToken = (setupToken ?? linkToken)!;
         try {
           await api.oidcLink(authToken, oidcToken);
           router.replace('/account?linked=1');
         } catch (e) {
-          setError(e instanceof Error ? e.message : 'Impossible de lier le compte.');
+          setAsyncError(e instanceof Error ? e.message : 'Impossible de lier le compte.');
         }
-      })();
-      return;
-    }
+        return;
+      }
 
-    if (setupToken && email) {
-      router.replace(`/oidc-setup?setup_token=${encodeURIComponent(setupToken)}&email=${encodeURIComponent(email)}`);
-      return;
-    }
+      if (setupToken && email) {
+        router.replace(`/oidc-setup?setup_token=${encodeURIComponent(setupToken)}&email=${encodeURIComponent(email)}`);
+        return;
+      }
 
-    if (linkToken && email) {
-      router.replace(`/oidc-link?link_token=${encodeURIComponent(linkToken)}&email=${encodeURIComponent(email)}`);
-      return;
-    }
+      if (linkToken && email) {
+        router.replace(`/oidc-link?link_token=${encodeURIComponent(linkToken)}&email=${encodeURIComponent(email)}`);
+        return;
+      }
 
-    setError("Paramètres de callback manquants. Vérifiez la configuration du backend.");
-  }, [params, router, setSession, authToken, authLoading]);
+      setAsyncError("Paramètres de callback manquants. Vérifiez la configuration du backend.");
+    })();
+  }, [params, router, authToken, authLoading, errParam]);
 
   if (error) {
     return (

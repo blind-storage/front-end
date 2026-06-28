@@ -131,7 +131,7 @@ export default function RegisterPage() {
             <h2 className="text-base font-semibold text-slate-100">Sauvegardez votre clé de recouvrement</h2>
           </div>
           <Alert variant="warning" className="mb-4">
-            Cette clé s'affiche <strong>une seule fois</strong>. Si vous perdez votre mot de passe maître sans elle,
+            Cette clé s&apos;affiche <strong>une seule fois</strong>. Si vous perdez votre mot de passe maître sans elle,
             votre compte est irrécupérable.
           </Alert>
           <div className="mb-4 rounded-lg border border-slate-600 bg-slate-900 p-4">
@@ -146,7 +146,7 @@ export default function RegisterPage() {
               className="mt-1 accent-emerald-500"
             />
             <label htmlFor="recovery-confirm" className="text-sm text-slate-300 cursor-pointer">
-              J'ai copié et sauvegardé cette clé en lieu sûr.
+              J&apos;ai copié et sauvegardé cette clé en lieu sûr.
             </label>
           </div>
           <Button

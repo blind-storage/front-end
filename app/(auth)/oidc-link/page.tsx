@@ -151,7 +151,7 @@ function OidcLinkForm() {
           {error && <Alert variant="error">{error}</Alert>}
 
           <Alert variant="info">
-            Votre compte a le double facteur activé. Entrez le code de votre application d'authentification.
+            Votre compte a le double facteur activé. Entrez le code de votre application d&apos;authentification.
           </Alert>
 
           <Input

@@ -31,12 +31,25 @@ function jwtPayload<T>(token: string): T {
   return JSON.parse(atob(b64)) as T;
 }
 
+function parsePendingOidcToken(): { token: string; username: string } | null {
+  if (typeof window === 'undefined') return null;
+  const stored = sessionStorage.getItem(PENDING_OIDC_TOKEN_KEY);
+  if (!stored) return null;
+  try {
+    const p = jwtPayload<{ oidcPending: boolean; username: string }>(stored);
+    return p.oidcPending ? { token: stored, username: p.username } : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function OidcUnlockPage() {
   const router = useRouter();
   const { setSession } = useAuth();
 
-  const [pendingToken, setPendingToken] = useState<string | null>(null);
-  const [username, setUsername] = useState('');
+  const [initData] = useState(parsePendingOidcToken);
+  const pendingToken = initData?.token ?? null;
+  const username = initData?.username ?? '';
   const [challenge, setChallenge] = useState<ChallengeData | null>(null);
   const [step, setStep] = useState<Step>('password');
 
@@ -49,34 +62,21 @@ export default function OidcUnlockPage() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  // 1. Read pending token from sessionStorage, decode username, fetch challenge
+  // 1. Validate pending token and fetch challenge
   useEffect(() => {
-    const stored = sessionStorage.getItem(PENDING_OIDC_TOKEN_KEY);
-    if (!stored) { router.replace('/login'); return; }
-
-    let sub: string;
-    let uname: string;
-    try {
-      const p = jwtPayload<{ oidcPending: boolean; sub: string; username: string }>(stored);
-      if (!p.oidcPending) throw new Error('not a pending token');
-      sub = p.sub;
-      uname = p.username;
-    } catch {
+    if (!pendingToken) {
       sessionStorage.removeItem(PENDING_OIDC_TOKEN_KEY);
       router.replace('/login');
       return;
     }
 
-    setPendingToken(stored);
-    setUsername(uname);
-
-    api.getOidcChallenge(stored)
+    api.getOidcChallenge(pendingToken)
       .then(setChallenge)
       .catch(() => {
         sessionStorage.removeItem(PENDING_OIDC_TOKEN_KEY);
         router.replace('/login');
       });
-  }, [router]);
+  }, [router, pendingToken]);
 
   // 2. User enters master password → decrypt private key → decrypt challenge → verify
   async function handlePassword(e: React.FormEvent) {
@@ -175,7 +175,7 @@ export default function OidcUnlockPage() {
         </h1>
         <p className="mt-2 text-sm text-slate-400">
           {step === 'totp' ? (
-            <>Entrez le code de votre application d'authentification.</>
+            <>Entrez le code de votre application d&apos;authentification.</>
           ) : (
             <>
               Connecté via OIDC en tant que{' '}

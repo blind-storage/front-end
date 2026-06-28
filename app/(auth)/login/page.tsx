@@ -23,11 +23,8 @@ export default function LoginPage() {
   // TOTP second step
   const [totpToken, setTotpToken] = useState('');
   const [totpCode, setTotpCode] = useState('');
-  // kek + encrypted key stored in memory between step 1 and step 2
+  // kek stored in memory between step 1 and step 2
   const pendingKek = useRef<CryptoKey | null>(null);
-  const pendingPrivKeyEnc = useRef<string | null>(null);
-  const pendingUserId = useRef<string | null>(null);
-  const pendingAccessToken = useRef<string | null>(null);
 
   const isTotpStep = totpToken !== '';
 

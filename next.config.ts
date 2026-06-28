@@ -11,6 +11,14 @@ const nextConfig: NextConfig = {
       '@nestjs/swagger': path.resolve(process.cwd(), './lib/nestjs-swagger-stub.js'),
     },
   },
+  webpack(config) {
+    config.resolve = config.resolve ?? {};
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      '@nestjs/swagger': path.resolve(process.cwd(), './lib/nestjs-swagger-stub.js'),
+    };
+    return config;
+  },
 };
 
 export default nextConfig;

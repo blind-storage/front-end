@@ -1,0 +1,5 @@
+# Fichiers sensibles — review obligatoire par un owner
+.github/workflows/    @thomas-cad @SlaouiX
+.github/CODEOWNERS    @thomas-cad @SlaouiX
+Dockerfile            @thomas-cad @SlaouiX
+next.config.ts        @thomas-cad @SlaouiX

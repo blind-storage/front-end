@@ -169,7 +169,7 @@ function OidcSetupForm() {
             <h2 className="text-base font-semibold text-slate-100">Sauvegardez votre clé de recouvrement</h2>
           </div>
           <Alert variant="warning" className="mb-4">
-            Cette clé s'affiche <strong>une seule fois</strong>. Sans elle, vous ne pourrez pas récupérer votre compte.
+            Cette clé s&apos;affiche <strong>une seule fois</strong>. Sans elle, vous ne pourrez pas récupérer votre compte.
           </Alert>
           <div className="mb-4 rounded-lg border border-slate-600 bg-slate-900 p-4">
             <p className="font-mono text-sm tracking-widest text-emerald-300 break-all">{recoveryCode}</p>
@@ -183,7 +183,7 @@ function OidcSetupForm() {
               className="mt-1 accent-emerald-500"
             />
             <label htmlFor="confirm-rc" className="text-sm text-slate-300 cursor-pointer">
-              J'ai copié et sauvegardé cette clé en lieu sûr.
+              J&apos;ai copié et sauvegardé cette clé en lieu sûr.
             </label>
           </div>
           <Button onClick={handleContinue} disabled={!recoveryConfirmed} className="w-full">
