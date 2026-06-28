@@ -7,6 +7,8 @@ RUN npm ci --ignore-scripts
 FROM node:22-alpine AS builder
 WORKDIR /workspace/frontend
 ENV NEXT_TELEMETRY_DISABLED=1
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 COPY --from=deps /workspace/types /workspace/types
 COPY --from=deps /workspace/frontend/node_modules ./node_modules
 COPY . .
