@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     privateKey: null,
     signingPrivateKey: null,
     isLoading: true,
-  });
+  }));
 
   // On mount: restore JWT from localStorage + reload profile, and restore the
   // private key from sessionStorage (survives reloads/redirects within the tab).
