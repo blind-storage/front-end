@@ -11,14 +11,18 @@ import * as api from '@/lib/api';
 import {
   createInitialTree,
   decryptPrivateKey,
+  decryptSigningPrivateKey,
   deriveMasterKeys,
   deriveRecoveryKey,
   encryptPrivateKey,
+  encryptSigningPrivateKey,
   encryptTEK,
   exportPublicKey,
+  exportSigningPublicKey,
   generateKeyPair,
   generateRecoveryCode,
   generateSalt,
+  generateSigningKeyPair,
   generateTEK,
   toBase64,
 } from '@/lib/crypto';
@@ -47,6 +51,7 @@ function OidcSetupForm() {
   // Retain the KEK and encrypted private key to avoid re-deriving in handleContinue
   const [savedKek, setSavedKek] = useState<CryptoKey | null>(null);
   const [savedPrivKeyEnc, setSavedPrivKeyEnc] = useState('');
+  const [savedSignPrivKeyEnc, setSavedSignPrivKeyEnc] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
@@ -85,6 +90,10 @@ function OidcSetupForm() {
       const pub_key = await exportPublicKey(keyPair.publicKey);
       const priv_key_enc_1 = await encryptPrivateKey(keyPair.privateKey, kek1);
       const priv_key_enc_2 = await encryptPrivateKey(keyPair.privateKey, kek2);
+      const signingKeyPair = await generateSigningKeyPair();
+      const sign_pub_key = await exportSigningPublicKey(signingKeyPair.publicKey);
+      const sign_priv_key_enc_1 = await encryptSigningPrivateKey(signingKeyPair.privateKey, kek1);
+      const sign_priv_key_enc_2 = await encryptSigningPrivateKey(signingKeyPair.privateKey, kek2);
 
       const tek = await generateTEK();
       const tree_enc_key = await encryptTEK(tek, keyPair.publicKey);
@@ -100,6 +109,9 @@ function OidcSetupForm() {
         pub_key,
         priv_key_enc_1,
         priv_key_enc_2,
+        sign_pub_key,
+        sign_priv_key_enc_1,
+        sign_priv_key_enc_2,
         salt_mp: salt_mp_b64,
         salt_rc: salt_rc_b64,
         tree_enc_key,
@@ -109,6 +121,7 @@ function OidcSetupForm() {
       setSavedToken(access_token);
       setSavedKek(kek1);
       setSavedPrivKeyEnc(priv_key_enc_1);
+      setSavedSignPrivKeyEnc(sign_priv_key_enc_1);
       setRecoveryCode(rc);
       setStep('recovery');
     } catch (err) {
@@ -125,7 +138,10 @@ function OidcSetupForm() {
       const profile = await api.getProfile(savedToken);
       const user = await api.getUser(profile.id, savedToken);
       const privateKey = await decryptPrivateKey(savedPrivKeyEnc, savedKek);
-      setSession(savedToken, user, privateKey);
+      const signingPrivateKey = savedSignPrivKeyEnc
+        ? await decryptSigningPrivateKey(savedSignPrivKeyEnc, savedKek)
+        : null;
+      setSession(savedToken, user, privateKey, signingPrivateKey);
       router.push('/dashboard');
     } catch {
       router.push('/dashboard');
