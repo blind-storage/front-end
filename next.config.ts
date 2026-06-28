@@ -1,6 +1,5 @@
 import path from 'path';
 import type { NextConfig } from 'next';
-import type { Configuration } from 'webpack';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
@@ -9,10 +8,10 @@ const nextConfig: NextConfig = {
       '@nestjs/swagger': path.resolve(process.cwd(), './lib/nestjs-swagger-stub.js'),
     },
   },
-  webpack(config: Configuration) {
+  webpack(config) {
     config.resolve = config.resolve ?? {};
     config.resolve.alias = {
-      ...(config.resolve.alias as Record<string, string>),
+      ...config.resolve.alias,
       '@nestjs/swagger': path.resolve(process.cwd(), './lib/nestjs-swagger-stub.js'),
     };
     return config;
