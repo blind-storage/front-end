@@ -62,13 +62,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function UserMenu({
-  user,
-  logout,
-}: {
-  user: UserResponse;
-  logout: () => void;
-}) {
+function UserMenu({ user, logout }: { user: UserResponse; logout: () => void }) {
+  const isAdmin = user.role === 'ADMIN';
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -147,6 +142,18 @@ function UserMenu({
               }
               onClick={() => setOpen(false)}
             />
+            {isAdmin && (
+              <MenuItem
+                href="/admin"
+                label="Administration"
+                icon={
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                }
+                onClick={() => setOpen(false)}
+              />
+            )}
           </div>
 
           <div className="border-t border-slate-700/60 py-1">

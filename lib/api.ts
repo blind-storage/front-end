@@ -144,6 +144,9 @@ export const createUser = (data: CreateUserDto) =>
 export const getUser = (id: string, token: string) =>
   request<UserResponse>(`/users/${id}`, { token });
 
+export const listUsers = (token: string) =>
+  request<UserResponse[]>('/users', { token });
+
 export const updateUser = (id: string, token: string, data: Partial<CreateUserDto>) =>
   request<UserResponse>(`/users/${id}`, { method: 'PATCH', body: JSON.stringify(data), token });
 

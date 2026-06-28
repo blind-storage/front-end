@@ -89,10 +89,6 @@ export default function HomePage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-4 py-24 text-center">
-        <div className="inline-flex items-center gap-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400 mb-6">
-          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
-          En développement actif
-        </div>
         <h1 className="text-5xl font-bold tracking-tight text-slate-100 sm:text-6xl">
           Stockage{' '}
           <span className="bg-gradient-to-r from-emerald-400 to-teal-400 bg-clip-text text-transparent">
@@ -104,9 +100,6 @@ export default function HomePage() {
           Votre vie privée est garantie par les mathématiques, pas par des promesses.
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">
-          <Link href="/register" className="rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white hover:bg-emerald-500 transition-colors shadow-lg shadow-emerald-900/30">
-            Commencer gratuitement
-          </Link>
           <Link href="/login" className="rounded-xl border border-slate-700 px-6 py-3 text-sm font-semibold text-slate-300 hover:bg-slate-800 hover:text-slate-100 transition-colors">
             Se connecter
           </Link>
