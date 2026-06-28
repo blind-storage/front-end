@@ -35,6 +35,7 @@ export interface FileShare {
   pub_key: string;
   read: boolean;
   write: boolean;
+  manage: boolean;
   grantedAt: string;
 }
 
@@ -50,6 +51,7 @@ export interface SharedDriveFile extends DriveFile {
   owner: { id: string; username: string; email: string; sign_pub_key: string | null };
   read: boolean;
   write: boolean;
+  manage: boolean;
   sharedAt: string;
 }
 
@@ -178,9 +180,9 @@ export const lookupUser = (token: string, query: string) =>
 export const shareFile = (
   token: string,
   fileId: string,
-  data: { recipientUserId: string; enc_fek: string; read?: boolean; write?: boolean },
+  data: { recipientUserId: string; enc_fek: string; read?: boolean; write?: boolean; manage?: boolean },
 ) =>
-  json<{ share: { userId: string; username: string; email: string; read: boolean; write: boolean } }>(
+  json<{ share: { userId: string; username: string; email: string; read: boolean; write: boolean; manage: boolean } }>(
     `/cloud-storage/files/${fileId}/shares`,
     token,
     { method: 'POST', body: JSON.stringify(data) },
@@ -188,6 +190,17 @@ export const shareFile = (
 
 export const listFileShares = (token: string, fileId: string) =>
   json<{ shares: FileShare[] }>(`/cloud-storage/files/${fileId}/shares`, token);
+
+export const updateFileShare = (
+  token: string,
+  fileId: string,
+  userId: string,
+  rights: { read?: boolean; write?: boolean; manage?: boolean },
+) =>
+  json<{ share: FileShare }>(`/cloud-storage/files/${fileId}/shares/${userId}`, token, {
+    method: 'PATCH',
+    body: JSON.stringify(rights),
+  });
 
 export const revokeFileShare = (token: string, fileId: string, userId: string) =>
   json<void>(`/cloud-storage/files/${fileId}/shares/${userId}`, token, { method: 'DELETE' });

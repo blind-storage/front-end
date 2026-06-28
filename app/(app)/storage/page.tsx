@@ -283,6 +283,7 @@ function StorageContent() {
       )}
       <Browser
         token={token}
+        currentUserId={user.id}
         provider={provider}
         pubKeyB64={user.pub_key}
         privateKey={privateKey}
@@ -296,7 +297,15 @@ function StorageContent() {
         reload={() => load(folderId)}
         onSharedChange={() => setSharedReloadKey((n) => n + 1)}
       />
-      <SharedFilesSection token={token} privateKey={privateKey} reloadKey={sharedReloadKey} onError={setError} />
+      <SharedFilesSection
+        token={token}
+        currentUserId={user.id}
+        privateKey={privateKey}
+        signingPrivateKey={signingPrivateKey}
+        reloadKey={sharedReloadKey}
+        onError={setError}
+        onNotice={setNotice}
+      />
     </div>
   );
 }
@@ -379,6 +388,7 @@ type UploadConflictDecision =
 
 function Browser({
   token,
+  currentUserId,
   provider,
   pubKeyB64,
   privateKey,
@@ -393,6 +403,7 @@ function Browser({
   onSharedChange,
 }: {
   token: string;
+  currentUserId: string;
   provider: drive.CloudProvider;
   pubKeyB64: string;
   privateKey: CryptoKey | null;
@@ -751,6 +762,7 @@ function Browser({
       {modal?.kind === 'manageShares' && (
         <ManageSharesModal
           token={token}
+          currentUserId={currentUserId}
           file={modal.file}
           onClose={() => setModal(null)}
           onChanged={() => {
@@ -923,19 +935,29 @@ function IconBtn({
 
 function SharedFilesSection({
   token,
+  currentUserId,
   privateKey,
+  signingPrivateKey,
   reloadKey,
   onError,
+  onNotice,
 }: {
   token: string;
+  currentUserId: string;
   privateKey: CryptoKey | null;
+  signingPrivateKey: CryptoKey | null;
   reloadKey: number;
   onError: (m: string) => void;
+  onNotice: (m: string) => void;
 }) {
   const [files, setFiles] = useState<SharedDriveFile[]>([]);
   const [filter, setFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [replacingId, setReplacingId] = useState<string | null>(null);
+  const [modal, setModal] = useState<Modal>(null);
+  const replaceInputRef = useRef<HTMLInputElement>(null);
+  const replaceTargetRef = useRef<SharedDriveFile | null>(null);
 
   const loadShared = useCallback(async () => {
     setLoading(true);
@@ -996,8 +1018,61 @@ function SharedFilesSection({
     }
   }
 
+  async function replaceSharedFile(file: SharedDriveFile, replacement: File) {
+    if (!privateKey) {
+      onError('Clé privée absente : reconnectez-vous pour remplacer ce fichier.');
+      return;
+    }
+    if (!signingPrivateKey) {
+      onError('Clé de signature absente : reconnectez-vous pour signer le remplacement.');
+      return;
+    }
+    if (!file.enc_fek) {
+      onError('Clé de fichier introuvable pour ce fichier partagé.');
+      return;
+    }
+    setReplacingId(file.id);
+    onError('');
+    try {
+      const fek = await decryptFileKey(file.enc_fek, privateKey);
+      const plaintext = await replacement.arrayBuffer();
+      const encryptedBlob = await encryptFileContent(fek, plaintext);
+      const encryptedBytes = await encryptedBlob.arrayBuffer();
+      const signature = await signBytes(signingPrivateKey, encryptedBytes);
+      await drive.uploadFile(
+        token,
+        file.provider,
+        encryptedBlob,
+        replacement.name,
+        file.enc_fek,
+        file.folderId,
+        signature,
+        file.id,
+        'preserve',
+      );
+      onNotice(`« ${file.name} » a été remplacé par « ${replacement.name} ».`);
+      await loadShared();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Échec du remplacement.');
+    } finally {
+      setReplacingId(null);
+    }
+  }
+
   return (
     <section className="rounded-2xl border border-slate-700/60 bg-slate-800/30">
+      <input
+        ref={replaceInputRef}
+        type="file"
+        hidden
+        onChange={(e) => {
+          const file = replaceTargetRef.current;
+          const replacement = e.target.files?.[0];
+          e.target.value = '';
+          replaceTargetRef.current = null;
+          if (file && replacement) replaceSharedFile(file, replacement);
+        }}
+      />
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-700/60 px-4 py-3">
         <div>
           <h2 className="text-base font-semibold text-slate-100">Fichiers partagés avec moi</h2>
@@ -1033,16 +1108,61 @@ function SharedFilesSection({
                 <IconBtn
                   title={privateKey ? 'Télécharger & déchiffrer' : 'Clé privée requise (reconnectez-vous)'}
                   onClick={() => download(file)}
-                  disabled={!privateKey || !file.enc_fek || downloadingId === file.id}
+                  disabled={!file.read || !privateKey || !file.enc_fek || downloadingId === file.id}
                   loading={downloadingId === file.id}
                 >
                   {I.download('h-4 w-4')}
                 </IconBtn>
+                {file.write && (
+                  <IconBtn
+                    title={signingPrivateKey ? 'Remplacer le fichier' : 'Clé de signature requise'}
+                    onClick={() => {
+                      replaceTargetRef.current = file;
+                      replaceInputRef.current?.click();
+                    }}
+                    disabled={!privateKey || !signingPrivateKey || replacingId === file.id}
+                    loading={replacingId === file.id}
+                  >
+                    {I.upload('h-4 w-4')}
+                  </IconBtn>
+                )}
+                {file.manage && (
+                  <>
+                    <IconBtn title="Partager" onClick={() => setModal({ kind: 'shareFile', file })}>
+                      {I.share('h-4 w-4')}
+                    </IconBtn>
+                    <IconBtn title="Gérer les partages" onClick={() => setModal({ kind: 'manageShares', file })}>
+                      {I.edit('h-4 w-4')}
+                    </IconBtn>
+                  </>
+                )}
               </div>
             ))}
           </div>
         )}
       </div>
+      {modal?.kind === 'shareFile' && (
+        <ShareModal
+          token={token}
+          file={modal.file}
+          privateKey={privateKey}
+          onClose={() => setModal(null)}
+          onShared={() => {
+            setModal(null);
+            onNotice(`« ${modal.file.name} » a été partagé.`);
+            loadShared();
+          }}
+        />
+      )}
+      {modal?.kind === 'manageShares' && (
+        <ManageSharesModal
+          token={token}
+          currentUserId={currentUserId}
+          file={modal.file}
+          onClose={() => setModal(null)}
+          onChanged={loadShared}
+        />
+      )}
     </section>
   );
 }
@@ -1115,6 +1235,9 @@ function ShareModal({
   onShared: () => void;
 }) {
   const [query, setQuery] = useState('');
+  const [canRead, setCanRead] = useState(true);
+  const [canWrite, setCanWrite] = useState(false);
+  const [canManage, setCanManage] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
 
@@ -1129,6 +1252,7 @@ function ShareModal({
       setErr('Clé de fichier introuvable pour ce fichier.');
       return;
     }
+    const read = canRead || canWrite || canManage;
 
     setBusy(true);
     setErr('');
@@ -1139,8 +1263,9 @@ function ShareModal({
       await drive.shareFile(token, file.id, {
         recipientUserId: recipient.id,
         enc_fek: encFek,
-        read: true,
-        write: false,
+        read,
+        write: canWrite,
+        manage: canManage,
       });
       onShared();
     } catch (e2) {
@@ -1163,9 +1288,54 @@ function ShareModal({
           autoFocus
           required
         />
+        <div className="space-y-2 rounded-xl border border-slate-700/60 p-3">
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={canRead || canWrite || canManage}
+              disabled={canWrite || canManage}
+              onChange={(e) => setCanRead(e.target.checked)}
+              className="mt-1 accent-emerald-500"
+            />
+            <span>
+              <span className="block font-medium text-slate-200">Télécharger</span>
+              <span className="text-xs text-slate-500">Voir le fichier partagé et le déchiffrer.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={canWrite}
+              onChange={(e) => {
+                setCanWrite(e.target.checked);
+                if (e.target.checked) setCanRead(true);
+              }}
+              className="mt-1 accent-emerald-500"
+            />
+            <span>
+              <span className="block font-medium text-slate-200">Remplacer</span>
+              <span className="text-xs text-slate-500">Écraser le contenu par une nouvelle version chiffrée.</span>
+            </span>
+          </label>
+          <label className="flex cursor-pointer items-start gap-2 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={canManage}
+              onChange={(e) => {
+                setCanManage(e.target.checked);
+                if (e.target.checked) setCanRead(true);
+              }}
+              className="mt-1 accent-emerald-500"
+            />
+            <span>
+              <span className="block font-medium text-slate-200">Gérer</span>
+              <span className="text-xs text-slate-500">Ajouter, modifier ou annuler les partages.</span>
+            </span>
+          </label>
+        </div>
         <div className="flex justify-end gap-2">
           <Button type="button" variant="ghost" onClick={onClose}>Annuler</Button>
-          <Button type="submit" isLoading={busy}>Partager</Button>
+          <Button type="submit" isLoading={busy} disabled={!canRead && !canWrite && !canManage}>Partager</Button>
         </div>
       </form>
     </Overlay>
@@ -1174,11 +1344,13 @@ function ShareModal({
 
 function ManageSharesModal({
   token,
+  currentUserId,
   file,
   onClose,
   onChanged,
 }: {
   token: string;
+  currentUserId: string;
   file: DriveFile;
   onClose: () => void;
   onChanged: () => void;
@@ -1202,7 +1374,7 @@ function ManageSharesModal({
   }, [token, file.id]);
 
   useEffect(() => {
-    loadShares();
+    void Promise.resolve().then(loadShares);
   }, [loadShares]);
 
   async function revoke(share: drive.FileShare) {
@@ -1214,6 +1386,27 @@ function ManageSharesModal({
       onChanged();
     } catch (e) {
       setErr(e instanceof Error ? e.message : 'Impossible d’annuler ce partage.');
+    } finally {
+      setBusyUserId(null);
+    }
+  }
+
+  async function updateRights(share: drive.FileShare, changes: { read?: boolean; write?: boolean; manage?: boolean }) {
+    setBusyUserId(share.userId);
+    setErr('');
+    try {
+      const nextWrite = changes.write ?? share.write;
+      const nextManage = changes.manage ?? share.manage;
+      const nextRead = (changes.read ?? share.read) || nextWrite || nextManage;
+      const res = await drive.updateFileShare(token, file.id, share.userId, {
+        read: nextRead,
+        write: nextWrite,
+        manage: nextManage,
+      });
+      setShares((current) => current.map((item) => (item.userId === share.userId ? res.share : item)));
+      onChanged();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Impossible de modifier ces droits.');
     } finally {
       setBusyUserId(null);
     }
@@ -1235,24 +1428,64 @@ function ManageSharesModal({
         <Alert variant="info" className="mb-4">Ce fichier n’est plus partagé avec personne.</Alert>
       ) : (
         <div className="max-h-72 overflow-auto rounded-xl border border-slate-700/60">
-          {shares.map((share) => (
-            <div key={share.userId} className="flex items-center gap-3 border-b border-slate-700/50 px-3 py-2.5 last:border-b-0">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-sm font-medium text-slate-200">{share.username}</p>
-                <p className="truncate text-xs text-slate-500">{share.email}</p>
+          {shares.map((share) => {
+            const isSelf = share.userId === currentUserId;
+            const disabled = busyUserId !== null || isSelf;
+            return (
+              <div key={share.userId} className="border-b border-slate-700/50 px-3 py-2.5 last:border-b-0">
+                <div className="flex items-center gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-slate-200">
+                      {share.username}{isSelf ? ' · Vous' : ''}
+                    </p>
+                    <p className="truncate text-xs text-slate-500">{share.email}</p>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    className="px-2.5 py-1.5 text-xs"
+                    isLoading={busyUserId === share.userId}
+                    disabled={disabled}
+                    onClick={() => revoke(share)}
+                  >
+                    Annuler
+                  </Button>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-3 text-xs text-slate-400">
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={share.read || share.write || share.manage}
+                      disabled={disabled || share.write || share.manage}
+                      onChange={(e) => updateRights(share, { read: e.target.checked })}
+                      className="accent-emerald-500"
+                    />
+                    Télécharger
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={share.write}
+                      disabled={disabled}
+                      onChange={(e) => updateRights(share, { write: e.target.checked })}
+                      className="accent-emerald-500"
+                    />
+                    Remplacer
+                  </label>
+                  <label className="flex items-center gap-1.5">
+                    <input
+                      type="checkbox"
+                      checked={share.manage}
+                      disabled={disabled}
+                      onChange={(e) => updateRights(share, { manage: e.target.checked })}
+                      className="accent-emerald-500"
+                    />
+                    Gérer
+                  </label>
+                </div>
               </div>
-              <Button
-                type="button"
-                variant="danger"
-                className="px-2.5 py-1.5 text-xs"
-                isLoading={busyUserId === share.userId}
-                disabled={busyUserId !== null}
-                onClick={() => revoke(share)}
-              >
-                Annuler
-              </Button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -1285,7 +1518,6 @@ function UploadConflictModal({
   useEffect(() => {
     if (existingFile.sharedCount <= 0) return;
     let cancelled = false;
-    setLoadingShares(true);
     drive.listFileShares(token, existingFile.id)
       .then((res) => {
         if (cancelled) return;
