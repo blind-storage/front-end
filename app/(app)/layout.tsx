@@ -28,23 +28,36 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
-      <header className="border-b border-slate-800 bg-slate-900/80 backdrop-blur">
+      <header className="relative z-50 border-b border-slate-800 bg-slate-900/80 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <Link href="/dashboard" className="flex items-center gap-2 group">
-            <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-600 group-hover:bg-emerald-500 transition-colors">
-              <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-white" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="11" width="18" height="11" rx="2" />
-                <path d="M7 11V7a5 5 0 0110 0v4" />
-              </svg>
-            </div>
-            <span className="text-sm font-semibold text-slate-100">Blind Storage</span>
-          </Link>
+          <div className="flex items-center gap-6">
+            <Link href="/dashboard" className="flex items-center gap-2 group">
+              <div className="flex h-7 w-7 items-center justify-center rounded bg-emerald-600 group-hover:bg-emerald-500 transition-colors">
+                <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 text-white" stroke="currentColor" strokeWidth="2">
+                  <rect x="3" y="11" width="18" height="11" rx="2" />
+                  <path d="M7 11V7a5 5 0 0110 0v4" />
+                </svg>
+              </div>
+              <span className="text-sm font-semibold text-slate-100">Blind Storage</span>
+            </Link>
+
+            <nav className="hidden items-center gap-1 sm:flex">
+              <Link href="/dashboard" className="rounded-lg px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors">
+                Tableau de bord
+              </Link>
+              <Link href="/storage" className="rounded-lg px-3 py-1.5 text-sm text-slate-400 hover:bg-slate-800 hover:text-slate-100 transition-colors">
+                Mes fichiers
+              </Link>
+            </nav>
+          </div>
 
           <UserMenu user={user} logout={logout} />
         </div>
       </header>
 
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className="mx-auto max-w-5xl px-4 pb-8 pt-8">
+        {children}
+      </main>
     </div>
   );
 }
@@ -79,7 +92,7 @@ function UserMenu({ user, logout }: { user: UserResponse; logout: () => void }) 
       </button>
 
       {open && (
-        <div className="absolute right-0 mt-2 w-52 rounded-xl border border-slate-700 bg-slate-900 shadow-xl py-1 z-50">
+        <div className="absolute right-0 z-[100] mt-2 w-52 rounded-xl border border-slate-700 bg-slate-900 py-1 shadow-2xl shadow-black/40">
           <div className="px-3 py-2.5 border-b border-slate-700/60">
             <p className="text-sm font-medium text-slate-200 truncate">{user.username}</p>
             <p className="text-xs text-slate-500 truncate">{user.email}</p>
@@ -93,6 +106,16 @@ function UserMenu({ user, logout }: { user: UserResponse; logout: () => void }) 
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
                   <rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" />
                   <rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" />
+                </svg>
+              }
+              onClick={() => setOpen(false)}
+            />
+            <MenuItem
+              href="/storage"
+              label="Mes fichiers"
+              icon={
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-4 w-4">
+                  <path d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v7a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" />
                 </svg>
               }
               onClick={() => setOpen(false)}

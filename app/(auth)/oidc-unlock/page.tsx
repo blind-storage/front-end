@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/auth';
 import * as api from '@/lib/api';
-import { decryptPrivateKey, deriveMasterKeys, fromBase64, toBase64 } from '@/lib/crypto';
+import { decryptPrivateKey, decryptSigningPrivateKey, deriveMasterKeys, fromBase64, toBase64 } from '@/lib/crypto';
 import { loadSalts } from '@/lib/storage';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -57,6 +57,7 @@ export default function OidcUnlockPage() {
   const [totpCode, setTotpCode] = useState('');
   const [totpToken, setTotpToken] = useState('');
   const [pendingPrivateKey, setPendingPrivateKey] = useState<CryptoKey | null>(null);
+  const [pendingKek, setPendingKek] = useState<CryptoKey | null>(null);
 
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -105,12 +106,13 @@ export default function OidcUnlockPage() {
       if ('totp_required' in result) {
         setTotpToken(result.totp_token);
         setPendingPrivateKey(privateKey);
+        setPendingKek(kek);
         setStep('totp');
         setIsLoading(false);
         return;
       }
 
-      await finaliseSession(result.access_token, privateKey);
+      await finaliseSession(result.access_token, privateKey, kek);
     } catch (err) {
       setIsLoading(false);
       const msg = err instanceof Error ? err.message : '';
@@ -131,7 +133,7 @@ export default function OidcUnlockPage() {
     setError('');
     try {
       const result = await api.totpVerify(totpToken, totpCode);
-      await finaliseSession(result.access_token, pendingPrivateKey);
+      await finaliseSession(result.access_token, pendingPrivateKey, pendingKek);
     } catch (err) {
       setIsLoading(false);
       const msg = err instanceof Error ? err.message : '';
@@ -139,11 +141,14 @@ export default function OidcUnlockPage() {
     }
   }
 
-  async function finaliseSession(accessToken: string, privateKey: CryptoKey) {
+  async function finaliseSession(accessToken: string, privateKey: CryptoKey, kek: CryptoKey | null) {
     const { sub } = jwtPayload<{ sub: string }>(accessToken);
     const user = await api.getUser(sub, accessToken);
+    const signingPrivateKey = kek && user.sign_priv_key_enc_1
+      ? await decryptSigningPrivateKey(user.sign_priv_key_enc_1, kek)
+      : null;
     sessionStorage.removeItem(PENDING_OIDC_TOKEN_KEY);
-    setSession(accessToken, user, privateKey);
+    setSession(accessToken, user, privateKey, signingPrivateKey);
     router.replace('/dashboard');
   }
 

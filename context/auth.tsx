@@ -3,7 +3,25 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import * as api from '@/lib/api';
 import type { UserResponse } from '@/lib/api';
-import { clearToken, loadToken, saveToken } from '@/lib/storage';
+import {
+  exportPrivateKeyBytes,
+  exportSigningPrivateKeyBytes,
+  fromBase64,
+  importPrivateKey,
+  importSigningPrivateKey,
+  toBase64,
+} from '@/lib/crypto';
+import {
+  clearPrivateKey,
+  clearSigningPrivateKey,
+  clearToken,
+  loadPrivateKey,
+  loadSigningPrivateKey,
+  loadToken,
+  savePrivateKey,
+  saveSigningPrivateKey,
+  saveToken,
+} from '@/lib/storage';
 
 export type { UserResponse };
 
@@ -12,11 +30,12 @@ interface AuthState {
   user: UserResponse | null;
   // Private key decrypted in memory — never persisted to disk or localStorage
   privateKey: CryptoKey | null;
+  signingPrivateKey: CryptoKey | null;
   isLoading: boolean;
 }
 
 interface AuthContextValue extends AuthState {
-  setSession(token: string, user: UserResponse, privateKey: CryptoKey): void;
+  setSession(token: string, user: UserResponse, privateKey: CryptoKey, signingPrivateKey?: CryptoKey | null): void;
   updateUser(user: UserResponse): void;
   logout(): void;
 }
@@ -28,28 +47,65 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     token: null,
     user: null,
     privateKey: null,
-    isLoading: loadToken() !== null,
+    signingPrivateKey: null,
+    isLoading: true,
   }));
 
-  // On mount: restore JWT from localStorage and reload user profile.
-  // The private key is NOT restored — the user must re-enter their password if the page refreshes.
+  // On mount: restore JWT from localStorage + reload profile, and restore the
+  // private key from sessionStorage (survives reloads/redirects within the tab).
   useEffect(() => {
     const token = loadToken();
-    if (!token) return;
-    api
-      .getProfile(token)
-      .then((profile) => api.getUser(profile.id, token))
-      .then((user) => setState({ token, user, privateKey: null, isLoading: false }))
-      // privateKey is null after a page refresh — the user must re-enter their password
-      .catch(() => {
+    if (!token) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- fin de chargement (pas de session)
+      setState((s) => ({ ...s, isLoading: false }));
+      return;
+    }
+    (async () => {
+      try {
+        const profile = await api.getProfile(token);
+        const user = await api.getUser(profile.id, token);
+        let privateKey: CryptoKey | null = null;
+        let signingPrivateKey: CryptoKey | null = null;
+        const stored = loadPrivateKey();
+        if (stored) {
+          try {
+            privateKey = await importPrivateKey(fromBase64(stored));
+          } catch {
+            clearPrivateKey(); // clé corrompue/illisible → on repart proprement
+          }
+        }
+        const storedSign = loadSigningPrivateKey();
+        if (storedSign) {
+          try {
+            signingPrivateKey = await importSigningPrivateKey(fromBase64(storedSign));
+          } catch {
+            clearSigningPrivateKey();
+          }
+        }
+        setState({ token, user, privateKey, signingPrivateKey, isLoading: false });
+      } catch {
         clearToken();
-        setState({ token: null, user: null, privateKey: null, isLoading: false });
-      });
+        clearPrivateKey();
+        clearSigningPrivateKey();
+        setState({ token: null, user: null, privateKey: null, signingPrivateKey: null, isLoading: false });
+      }
+    })();
   }, []);
 
-  const setSession = useCallback((token: string, user: UserResponse, privateKey: CryptoKey) => {
+  const setSession = useCallback((token: string, user: UserResponse, privateKey: CryptoKey, signingPrivateKey?: CryptoKey | null) => {
     saveToken(token);
-    setState({ token, user, privateKey, isLoading: false });
+    setState({ token, user, privateKey, signingPrivateKey: signingPrivateKey ?? null, isLoading: false });
+    // Persiste la clé pour la durée de l'onglet (fire-and-forget).
+    exportPrivateKeyBytes(privateKey)
+      .then((buf) => savePrivateKey(toBase64(buf)))
+      .catch(() => {});
+    if (signingPrivateKey) {
+      exportSigningPrivateKeyBytes(signingPrivateKey)
+        .then((buf) => saveSigningPrivateKey(toBase64(buf)))
+        .catch(() => {});
+    } else {
+      clearSigningPrivateKey();
+    }
   }, []);
 
   const updateUser = useCallback((user: UserResponse) => {
@@ -58,7 +114,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     clearToken();
-    setState({ token: null, user: null, privateKey: null, isLoading: false });
+    clearPrivateKey();
+    clearSigningPrivateKey();
+    setState({ token: null, user: null, privateKey: null, signingPrivateKey: null, isLoading: false });
   }, []);
 
   return (

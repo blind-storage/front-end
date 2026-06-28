@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useRef, useState } from 'react';
 import { useAuth } from '@/context/auth';
 import * as api from '@/lib/api';
-import { decryptPrivateKey, deriveMasterKeys, fromBase64 } from '@/lib/crypto';
+import { decryptPrivateKey, decryptSigningPrivateKey, deriveMasterKeys, fromBase64 } from '@/lib/crypto';
 import { loadSalts } from '@/lib/storage';
 import { Alert } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -58,10 +58,13 @@ export default function LoginPage() {
       const profile = await api.getProfile(access_token);
       const user = await api.getUser(profile.id, access_token);
 
-      if (!profile.priv_key_enc_1) throw new Error('Clé privée introuvable sur le serveur.');
-      const privateKey = await decryptPrivateKey(profile.priv_key_enc_1, kek);
+      if (!user.priv_key_enc_1) throw new Error('Clé privée introuvable sur le serveur.');
+      const privateKey = await decryptPrivateKey(user.priv_key_enc_1, kek);
+      const signingPrivateKey = user.sign_priv_key_enc_1
+        ? await decryptSigningPrivateKey(user.sign_priv_key_enc_1, kek)
+        : null;
 
-      setSession(access_token, user, privateKey);
+      setSession(access_token, user, privateKey, signingPrivateKey);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur de connexion.');
@@ -79,10 +82,13 @@ export default function LoginPage() {
       const profile = await api.getProfile(access_token);
       const user = await api.getUser(profile.id, access_token);
 
-      if (!profile.priv_key_enc_1) throw new Error('Clé privée introuvable sur le serveur.');
-      const privateKey = await decryptPrivateKey(profile.priv_key_enc_1, pendingKek.current!);
+      if (!user.priv_key_enc_1) throw new Error('Clé privée introuvable sur le serveur.');
+      const privateKey = await decryptPrivateKey(user.priv_key_enc_1, pendingKek.current!);
+      const signingPrivateKey = user.sign_priv_key_enc_1
+        ? await decryptSigningPrivateKey(user.sign_priv_key_enc_1, pendingKek.current!)
+        : null;
 
-      setSession(access_token, user, privateKey);
+      setSession(access_token, user, privateKey, signingPrivateKey);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Code TOTP invalide.');
