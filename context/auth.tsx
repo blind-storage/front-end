@@ -24,21 +24,18 @@ interface AuthContextValue extends AuthState {
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [state, setState] = useState<AuthState>({
+  const [state, setState] = useState<AuthState>(() => ({
     token: null,
     user: null,
     privateKey: null,
-    isLoading: true,
-  });
+    isLoading: loadToken() !== null,
+  }));
 
   // On mount: restore JWT from localStorage and reload user profile.
   // The private key is NOT restored — the user must re-enter their password if the page refreshes.
   useEffect(() => {
     const token = loadToken();
-    if (!token) {
-      setState((s) => ({ ...s, isLoading: false }));
-      return;
-    }
+    if (!token) return;
     api
       .getProfile(token)
       .then((profile) => api.getUser(profile.id, token))

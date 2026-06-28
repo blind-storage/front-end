@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Compiled output of the local @blind-storage/types package (symlinked via node_modules)
+    "types/**",
   ]),
 ]);
 
