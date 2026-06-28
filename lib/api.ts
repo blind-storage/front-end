@@ -120,6 +120,29 @@ export const oidcLink = (token: string, oidcToken: string) =>
     token,
   });
 
+// ── PKI ──────────────────────────────────────────────────────────────────────
+
+export interface BlindCertificate {
+  version: 1;
+  subject: { id: string; username: string; email: string };
+  pub_key: string;
+  fingerprint: string;
+  issued_at: string;
+  expires_at: string;
+}
+
+export interface BlindCrl {
+  version: 1;
+  issued_at: string;
+  revoked: { fingerprint: string; revoked_at: string; reason: string }[];
+}
+
+// GET /pki/ca — clé publique de la CA (PEM)
+export const getCaCert = () => request<{ pub_key: string }>('/pki/ca');
+
+// GET /pki/crl — liste de révocation signée
+export const getCrl = () => request<{ crl: BlindCrl; signature: string }>('/pki/crl');
+
 // ── Users ────────────────────────────────────────────────────────────────────
 
 // The backend returns UserEntity but may include extra fields (salts, encrypted keys)
@@ -132,10 +155,10 @@ export interface UserResponse extends UserEntity {
   sign_pub_key?: string | null;
   sign_priv_key_enc_1?: string | null;
   sign_priv_key_enc_2?: string | null;
-  key_certificate?: unknown;
+  tree_enc_key?: string | null;
+  key_certificate?: BlindCertificate | null;
   key_certificate_signature?: string | null;
   key_fingerprint?: string | null;
-  tree_enc_key?: string;
 }
 
 export const createUser = (data: CreateUserDto) =>
