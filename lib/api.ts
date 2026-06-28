@@ -75,7 +75,7 @@ export const changePassword = (
 // ── OIDC ─────────────────────────────────────────────────────────────────────
 
 // Returns the full URL to redirect the browser to for OIDC login
-export function oidcLoginUrl(provider: 'google' | 'rezel' | 'dropbox'): string {
+export function oidcLoginUrl(provider: 'google' | 'dropbox'): string {
   return `${API_URL}/auth/${provider}`;
 }
 

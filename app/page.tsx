@@ -35,7 +35,7 @@ const FEATURES = [
   },
   {
     title: 'Connexion sociale',
-    description: 'Liez votre compte Google, Rezel ou Dropbox pour vous connecter sans mot de passe, tout en conservant le chiffrement.',
+    description: 'Liez votre compte Google ou Dropbox pour vous connecter sans mot de passe, tout en conservant le chiffrement.',
     icon: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="h-6 w-6">
         <circle cx="18" cy="5" r="3" /><circle cx="6" cy="12" r="3" /><circle cx="18" cy="19" r="3" />
