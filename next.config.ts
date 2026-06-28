@@ -8,7 +8,7 @@ const nextConfig: NextConfig = {
       '@nestjs/swagger': path.resolve(process.cwd(), './lib/nestjs-swagger-stub.js'),
     },
   },
-  webpack(config: any) {
+  webpack(config) {
     config.resolve = config.resolve ?? {};
     config.resolve.alias = {
       ...config.resolve.alias,
