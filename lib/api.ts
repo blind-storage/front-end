@@ -1,7 +1,6 @@
 import type {
   AuthResponseDto,
   CreateUserDto,
-  EnableTotpResponseDto,
   JwtUser,
   OidcConnectionDto,
   OidcLinkPendingResponseDto,
@@ -11,7 +10,7 @@ import type {
   UserEntity,
 } from '@blind-storage/types';
 
-export type { AuthResponseDto, CreateUserDto, EnableTotpResponseDto, JwtUser, OidcConnectionDto, OidcSetupDto, TotpRequiredResponseDto, UserEntity };
+export type { AuthResponseDto, CreateUserDto, JwtUser, OidcConnectionDto, OidcSetupDto, TotpRequiredResponseDto, UserEntity };
 
 // Login response is either a token, a pending OIDC state, or a TOTP challenge
 export type LoginOidcResponse =
@@ -185,7 +184,7 @@ export const deleteOidcConnection = (id: string, token: string, provider: string
 // ── TOTP ─────────────────────────────────────────────────────────────────────
 
 export const enableTotp = (id: string, token: string, secret: string, code: string) =>
-  request<EnableTotpResponseDto>(`/users/${id}/totp/enable`, {
+  request<{ user: UserResponse; recovery_codes: string[] }>(`/users/${id}/totp/enable`, {
     method: 'POST',
     body: JSON.stringify({ secret, code }),
     token,
