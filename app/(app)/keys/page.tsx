@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth';
 import * as api from '@/lib/api';
-import type { BlindCertificate, BlindCrl } from '@/lib/api';
+import type { BlindCertificate } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -48,24 +48,25 @@ function isBlindCertificate(v: unknown): v is BlindCertificate {
 }
 
 function CertificateCard({ user }: { user: api.UserResponse }) {
-  const [verifyState, setVerifyState] = useState<VerifyState>({ status: 'idle' });
-
   const cert = isBlindCertificate(user.key_certificate) ? user.key_certificate : null;
   const signature = user.key_certificate_signature ?? null;
   const fingerprint = user.key_fingerprint ?? null;
 
+  const [verifyState, setVerifyState] = useState<VerifyState>(() => {
+    if (cert && signature) return { status: 'loading' };
+    return user.key_certificate ? { status: 'legacy' } : { status: 'none' };
+  });
+
   useEffect(() => {
-    if (!cert || !signature) {
-      setVerifyState(user.key_certificate ? { status: 'legacy' } : { status: 'none' });
-      return;
-    }
-    setVerifyState({ status: 'loading' });
+    if (!cert || !signature) return;
+    let cancelled = false;
 
     (async () => {
       try {
         const [caRes, crlRes] = await Promise.all([api.getCaCert(), api.getCrl()]);
         const { verifyUserCertificate } = await import('@/lib/pki');
         const result = await verifyUserCertificate(cert, signature, caRes.pub_key, crlRes.crl);
+        if (cancelled) return;
         if (result.trusted) {
           setVerifyState({ status: 'verified' });
         } else if (result.reason === 'Certificat révoqué') {
@@ -74,9 +75,11 @@ function CertificateCard({ user }: { user: api.UserResponse }) {
           setVerifyState({ status: 'invalid', reason: result.reason });
         }
       } catch (e) {
+        if (cancelled) return;
         setVerifyState({ status: 'error', reason: e instanceof Error ? e.message : 'Erreur inconnue' });
       }
     })();
+    return () => { cancelled = true; };
   }, [cert, signature]);
 
   return (
