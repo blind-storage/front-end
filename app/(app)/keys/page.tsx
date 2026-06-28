@@ -1,7 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/context/auth';
+import * as api from '@/lib/api';
+import type { BlindCertificate, BlindCrl } from '@/lib/api';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 
@@ -16,11 +18,124 @@ export default function KeysPage() {
         <p className="mt-1 text-sm text-slate-400">Informations sur votre paire de clés cryptographiques.</p>
       </div>
 
+      <CertificateCard user={user} />
       <PublicKeyCard pubKey={user.pub_key} />
       <PrivateKeyCard privateKey={privateKey} />
     </div>
   );
 }
+
+// ── Certificat ────────────────────────────────────────────────────────────────
+
+type VerifyState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'verified' }
+  | { status: 'revoked'; reason: string }
+  | { status: 'invalid'; reason: string }
+  | { status: 'legacy' }
+  | { status: 'none' }
+  | { status: 'error'; reason: string };
+
+function isBlindCertificate(v: unknown): v is BlindCertificate {
+  return (
+    typeof v === 'object' &&
+    v !== null &&
+    (v as BlindCertificate).version === 1 &&
+    typeof (v as BlindCertificate).fingerprint === 'string' &&
+    typeof (v as BlindCertificate).issued_at === 'string'
+  );
+}
+
+function CertificateCard({ user }: { user: api.UserResponse }) {
+  const [verifyState, setVerifyState] = useState<VerifyState>({ status: 'idle' });
+
+  const cert = isBlindCertificate(user.key_certificate) ? user.key_certificate : null;
+  const signature = user.key_certificate_signature ?? null;
+  const fingerprint = user.key_fingerprint ?? null;
+
+  useEffect(() => {
+    if (!cert || !signature) {
+      setVerifyState(user.key_certificate ? { status: 'legacy' } : { status: 'none' });
+      return;
+    }
+    setVerifyState({ status: 'loading' });
+
+    (async () => {
+      try {
+        const [caRes, crlRes] = await Promise.all([api.getCaCert(), api.getCrl()]);
+        const { verifyUserCertificate } = await import('@/lib/pki');
+        const result = await verifyUserCertificate(cert, signature, caRes.pub_key, crlRes.crl);
+        if (result.trusted) {
+          setVerifyState({ status: 'verified' });
+        } else if (result.reason === 'Certificat révoqué') {
+          setVerifyState({ status: 'revoked', reason: result.reason });
+        } else {
+          setVerifyState({ status: 'invalid', reason: result.reason });
+        }
+      } catch (e) {
+        setVerifyState({ status: 'error', reason: e instanceof Error ? e.message : 'Erreur inconnue' });
+      }
+    })();
+  }, [cert, signature]);
+
+  return (
+    <Card title="Certificat de clé publique" description="Émis par la CA Blind Storage — garantit l'authenticité de votre clé publique.">
+      <div className="space-y-4">
+        <StatusBadge state={verifyState} />
+
+        {cert ? (
+          <dl className="space-y-2 text-xs">
+            <Row label="Sujet" value={`${cert.subject.username} — ${cert.subject.email}`} />
+            <Row label="Empreinte (SHA-256)" value={fingerprint ? fingerprint.match(/.{1,8}/g)?.join(' ') ?? fingerprint : '—'} mono />
+            <Row label="Émis le" value={new Date(cert.issued_at).toLocaleString('fr-FR')} />
+            <Row label="Expire le" value={new Date(cert.expires_at).toLocaleString('fr-FR')} />
+            <Row label="Algorithme CA" value="ECDSA P-256 / SHA-256" />
+          </dl>
+        ) : (
+          <p className="text-xs text-slate-500">
+            {verifyState.status === 'none'
+              ? 'Aucun certificat associé à ce compte.'
+              : 'Format de certificat hérité (HMAC) — non vérifiable par la CA asymétrique.'}
+          </p>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+function StatusBadge({ state }: { state: VerifyState }) {
+  const configs: Record<VerifyState['status'], { label: string; classes: string }> = {
+    idle:     { label: 'Non vérifié',   classes: 'bg-slate-700 text-slate-400' },
+    loading:  { label: 'Vérification…', classes: 'bg-slate-700 text-slate-400 animate-pulse' },
+    verified: { label: 'Vérifié CA',    classes: 'bg-emerald-500/15 text-emerald-400' },
+    revoked:  { label: 'Révoqué',       classes: 'bg-red-500/15 text-red-400' },
+    invalid:  { label: 'Signature invalide', classes: 'bg-red-500/15 text-red-400' },
+    legacy:   { label: 'Hérité (HMAC)', classes: 'bg-amber-500/15 text-amber-400' },
+    none:     { label: 'Absent',        classes: 'bg-slate-700 text-slate-400' },
+    error:    { label: 'Erreur',        classes: 'bg-red-500/15 text-red-400' },
+  };
+  const c = configs[state.status];
+  const detail = 'reason' in state ? state.reason : undefined;
+
+  return (
+    <div className="flex items-center gap-3">
+      <span className={`rounded-full px-3 py-1 text-xs font-medium ${c.classes}`}>{c.label}</span>
+      {detail && <span className="text-xs text-slate-500">{detail}</span>}
+    </div>
+  );
+}
+
+function Row({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex gap-3 rounded-lg bg-slate-900/50 px-3 py-2">
+      <dt className="w-40 shrink-0 text-slate-400 font-medium">{label}</dt>
+      <dd className={`break-all text-slate-300 ${mono ? 'font-mono' : ''}`}>{value}</dd>
+    </div>
+  );
+}
+
+// ── Clé publique ──────────────────────────────────────────────────────────────
 
 function PublicKeyCard({ pubKey }: { pubKey: string }) {
   const [show, setShow] = useState(false);
@@ -82,6 +197,8 @@ function PublicKeyCard({ pubKey }: { pubKey: string }) {
   );
 }
 
+// ── Clé privée ────────────────────────────────────────────────────────────────
+
 function PrivateKeyCard({ privateKey }: { privateKey: CryptoKey | null }) {
   return (
     <Card title="Clé privée" description="Jamais transmise au serveur — déchiffrée localement à partir de votre mot de passe maître.">
@@ -103,7 +220,7 @@ function PrivateKeyCard({ privateKey }: { privateKey: CryptoKey | null }) {
         <div className="rounded-lg border border-slate-700/50 bg-slate-900/30 px-4 py-3 space-y-2 text-xs text-slate-500">
           <p><span className="text-slate-400 font-medium">Algorithme :</span> RSA-OAEP 2048 bits</p>
           <p><span className="text-slate-400 font-medium">Chiffrement au repos :</span> AES-GCM 256 bits (KEK dérivée du mot de passe maître)</p>
-          <p><span className="text-slate-400 font-medium">Dérivation KEK :</span> PBKDF2 — SHA-256, 100 000 itérations</p>
+          <p><span className="text-slate-400 font-medium">Dérivation KEK :</span> PBKDF2 — SHA-256, 600 000 itérations</p>
           <p><span className="text-slate-400 font-medium">Persistance :</span> Jamais — déchiffrée uniquement en mémoire à la connexion</p>
         </div>
       </div>
