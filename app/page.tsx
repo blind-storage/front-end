@@ -100,7 +100,7 @@ export default function HomePage() {
           </span>
         </h1>
         <p className="mx-auto mt-6 max-w-xl text-lg text-slate-400 leading-relaxed">
-          Vos fichiers, chiffrés sur votre appareil. Le serveur ne stocke que des données qu'il ne peut pas lire.
+          Vos fichiers, chiffrés sur votre appareil. Le serveur ne stocke que des données qu&apos;il ne peut pas lire.
           Votre vie privée est garantie par les mathématiques, pas par des promesses.
         </p>
         <div className="mt-10 flex flex-wrap items-center justify-center gap-3">

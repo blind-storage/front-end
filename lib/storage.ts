@@ -11,22 +11,27 @@ export interface StoredSalts {
 }
 
 export function saveToken(token: string) {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(TOKEN_KEY, token);
 }
 
 export function loadToken(): string | null {
+  if (typeof window === 'undefined') return null;
   return localStorage.getItem(TOKEN_KEY);
 }
 
 export function clearToken() {
+  if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
 }
 
 export function saveSalts(username: string, salts: StoredSalts) {
+  if (typeof window === 'undefined') return;
   localStorage.setItem(SALT_PREFIX + username, JSON.stringify(salts));
 }
 
 export function loadSalts(username: string): StoredSalts | null {
+  if (typeof window === 'undefined') return null;
   const raw = localStorage.getItem(SALT_PREFIX + username);
   if (!raw) return null;
   try {
