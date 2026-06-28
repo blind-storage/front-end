@@ -127,9 +127,9 @@ export const oidcLink = (token: string, oidcToken: string) =>
 export interface UserResponse extends UserEntity {
   salt_mp?: string;
   salt_rc?: string;
-  priv_key_enc_1?: string;
-  priv_key_enc_2?: string;
-  tree_enc_key?: string;
+  priv_key_enc_1?: string | null;
+  priv_key_enc_2?: string | null;
+  tree_enc_key?: string | null;
 }
 
 export const createUser = (data: CreateUserDto) =>
