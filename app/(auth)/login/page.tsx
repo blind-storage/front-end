@@ -192,7 +192,6 @@ export default function LoginPage() {
         <div className="mt-3 flex flex-col gap-2">
           <OidcButton provider="google" label="Google" icon={<GoogleIcon />} />
           <OidcButton provider="dropbox" label="Dropbox" icon={<DropboxIcon />} />
-          <OidcButton provider="rezel" label="Rezel" icon={<RezelIcon />} />
         </div>
       </div>
 
@@ -211,7 +210,7 @@ function OidcButton({
   label,
   icon,
 }: {
-  provider: 'google' | 'dropbox' | 'rezel';
+  provider: 'google' | 'dropbox';
   label: string;
   icon: React.ReactNode;
 }) {
@@ -258,10 +257,3 @@ function DropboxIcon() {
   );
 }
 
-function RezelIcon() {
-  return (
-    <span className="flex h-4 w-4 items-center justify-center rounded bg-violet-600 text-[8px] font-bold text-white leading-none">
-      R
-    </span>
-  );
-}
