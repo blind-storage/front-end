@@ -114,7 +114,6 @@ function ProfileForm({
 
 const PROVIDERS: { key: string; label: string }[] = [
   { key: 'GOOGLE', label: 'Google' },
-  { key: 'REZEL', label: 'Rezel' },
   { key: 'DROPBOX', label: 'Dropbox' },
 ];
 
@@ -166,7 +165,7 @@ function LinkedProviders({ userId, token }: { userId: string; token: string }) {
                     Délier
                   </Button>
                 ) : (
-                  <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={() => { window.location.href = api.oidcLoginUrl(key.toLowerCase() as 'google' | 'rezel' | 'dropbox'); }}>
+                  <Button variant="secondary" className="px-3 py-1.5 text-xs" onClick={() => { window.location.href = api.oidcLoginUrl(key.toLowerCase() as 'google' | 'dropbox'); }}>
                     Lier
                   </Button>
                 )}
